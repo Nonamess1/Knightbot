@@ -1,46 +1,30 @@
-const axios = require('axios');
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
-let triviaGames = {};
+# Bot Token
+TOKEN = 'YOUR_BOT_TOKEN_HERE'
 
-async function startTrivia(sock, chatId) {
-    if (triviaGames[chatId]) {
-        sock.sendMessage(chatId, { text: 'A trivia game is already in progress!' });
-        return;
-    }
+# Function to remove members
+def kill_members(update: Update, context: CallbackContext) -> None:
+    if update.message.chat.type == "group" or update.message.chat.type == "supergroup":
+        for member in update.message.chat.get_members():
+            try:
+                context.bot.kick_chat_member(update.message.chat.id, member.user.id)
+                print(f"Removing {member.user.username}")
+            except Exception as e:
+                print(f"Error removing {member.user.username}: {e}")
 
-    try {
-        const response = await axios.get('https://opentdb.com/api.php?amount=1&type=multiple');
-        const questionData = response.data.results[0];
+# Main function
+def main() -> None:
+    updater = Updater(TOKEN)
 
-        triviaGames[chatId] = {
-            question: questionData.question,
-            correctAnswer: questionData.correct_answer,
-            options: [...questionData.incorrect_answers, questionData.correct_answer].sort(),
-        };
+    # Handler for the /kill command
+    updater.dispatcher.add_handler(CommandHandler('kill', kill_members))
 
-        sock.sendMessage(chatId, {
-            text: `Trivia Time!\n\nQuestion: ${triviaGames[chatId].question}\nOptions:\n${triviaGames[chatId].options.join('\n')}`
-        });
-    } catch (error) {
-        sock.sendMessage(chatId, { text: 'Error fetching trivia question. Try again later.' });
-    }
-}
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
 
-function answerTrivia(sock, chatId, answer) {
-    if (!triviaGames[chatId]) {
-        sock.sendMessage(chatId, { text: 'No trivia game is in progress.' });
-        return;
-    }
+if __name__ == '__main__':
+    main()
 
-    const game = triviaGames[chatId];
-
-    if (answer.toLowerCase() === game.correctAnswer.toLowerCase()) {
-        sock.sendMessage(chatId, { text: `Correct! The answer is ${game.correctAnswer}` });
-    } else {
-        sock.sendMessage(chatId, { text: `Wrong! The correct answer was ${game.correctAnswer}` });
-    }
-
-    delete triviaGames[chatId];
-}
-
-module.exports = { startTrivia, answerTrivia };
